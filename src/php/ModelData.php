@@ -389,6 +389,92 @@ class ModelData
         return $this;
     }
     
+    public function get( $fields )
+    {
+        $results = array( );
+        if ( !$fields || empty( $fields ) ) return $results;
+        $data =& $this->Data;
+        $is_object = is_object( $data ); $is_array = is_array( $data );
+        if ( $is_object || $is_array )
+        {
+            $WILDCARD = self::WILDCARD;
+            foreach((array)$fields as $dottedKey)
+            {
+                $stack = array( array(&$data, $dottedKey) );
+                while ( !empty($stack) )
+                {
+                    $to_get = array_pop( $stack );
+                    $o =& $to_get[0];
+                    $key = $to_get[1];
+                    $p = explode('.', $key);
+                    $i = 0; $l = count($p);
+                    while ($i < $l)
+                    {
+                        $k = $p[$i++];
+                        if ( $i < $l )
+                        {
+                            if ( is_object( $o ) ) 
+                            {
+                                if ( $WILDCARD === $k ) 
+                                {
+                                    $k = implode('.', array_slice($p, $i));
+                                    foreach(array_keys((array)$o) as $key)
+                                        $stack[] = array(&$o, "{$key}.{$k}");
+                                    break;
+                                }
+                                elseif ( isset($o->{$k}) ) 
+                                {
+                                    $o =& $o->{$k};
+                                }
+                            }
+                            elseif ( is_array( $o ) ) 
+                            {
+                                if ( $WILDCARD === $k ) 
+                                {
+                                    $k = implode('.', array_slice($p, $i));
+                                    foreach(array_keys($o) as $key)
+                                        $stack[] = array(&$o, "{$key}.{$k}");
+                                    break;
+                                }
+                                elseif ( isset($o[$k]) ) 
+                                {
+                                    $o =& $o[$k];
+                                }
+                            }
+                            else break; // key does not exist
+                        }
+                        else
+                        {
+                            if ( is_object($o) ) 
+                            {
+                                if ( $WILDCARD === $k )
+                                {
+                                    foreach(array_keys((array)$o) as $k) $results[] = $o->{$k};
+                                }
+                                elseif ( isset($o->{$k}) )
+                                {
+                                    $results[] = $o->{$k};
+                                }
+                            }
+                            elseif ( is_array($o) ) 
+                            {
+                                if ( $WILDCARD === $k )
+                                {
+                                    foreach(array_keys($o) as $k) $results[] = $o[$k];
+                                }
+                                elseif ( isset($o[$k]) )
+                                {
+                                    $results[] = $o[$k];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return $results;
+    }
+    
     public function remove( $fields )
     {
         if ( !$fields || empty( $fields ) ) return $this;
@@ -419,6 +505,7 @@ class ModelData
                                     $k = implode('.', array_slice($p, $i));
                                     foreach(array_keys((array)$o) as $key)
                                         $stack[] = array(&$o, "{$key}.{$k}");
+                                    break;
                                 }
                                 elseif ( isset($o->{$k}) ) 
                                 {
@@ -432,6 +519,7 @@ class ModelData
                                     $k = implode('.', array_slice($p, $i));
                                     foreach(array_keys($o) as $key)
                                         $stack[] = array(&$o, "{$key}.{$k}");
+                                    break;
                                 }
                                 elseif ( isset($o[$k]) ) 
                                 {
@@ -446,7 +534,8 @@ class ModelData
                             {
                                 if ( $WILDCARD === $k )
                                 {
-                                    foreach(array_keys((array)$o) as $k) unset( $o->{$k} );
+                                    foreach(array_keys((array)$o) as $k) 
+                                        unset( $o->{$k} );
                                 }
                                 elseif ( isset($o->{$k}) )
                                 {
@@ -457,11 +546,16 @@ class ModelData
                             {
                                 if ( $WILDCARD === $k )
                                 {
-                                    foreach(array_keys($o) as $k) unset( $o[$k] );
+                                    foreach(array_reverse(array_keys($o)) as $k) 
+                                    {
+                                        if ( is_numeric($k) ) array_splice($o, (int)$k, 1);
+                                        else unset( $o[$k] );
+                                    }
                                 }
                                 elseif ( isset($o[$k]) )
                                 {
-                                    unset( $o[$k] );
+                                    if ( is_numeric($k) ) array_splice( $o, (int)$k, 1 );
+                                    else unset( $o[$k] );
                                 }
                             }
                         }
