@@ -389,6 +389,89 @@ class ModelData
         return $this;
     }
     
+    public function remove( $fields )
+    {
+        if ( !$fields || empty( $fields ) ) return $this;
+        $data =& $this->Data;
+        $is_object = is_object( $data ); $is_array = is_array( $data );
+        if ( $is_object || $is_array )
+        {
+            $WILDCARD = self::WILDCARD;
+            foreach((array)$fields as $dottedKey)
+            {
+                $stack = array( array(&$data, $dottedKey) );
+                while ( !empty($stack) )
+                {
+                    $to_remove = array_pop( $stack );
+                    $o =& $to_remove[0];
+                    $key = $to_remove[1];
+                    $p = explode('.', $key);
+                    $i = 0; $l = count($p);
+                    while ($i < $l)
+                    {
+                        $k = $p[$i++];
+                        if ( $i < $l )
+                        {
+                            if ( is_object( $o ) ) 
+                            {
+                                if ( $WILDCARD === $k ) 
+                                {
+                                    $k = implode('.', array_slice($p, $i));
+                                    foreach(array_keys((array)$o) as $key)
+                                        $stack[] = array(&$o, "{$key}.{$k}");
+                                }
+                                elseif ( isset($o->{$k}) ) 
+                                {
+                                    $o =& $o->{$k};
+                                }
+                            }
+                            elseif ( is_array( $o ) ) 
+                            {
+                                if ( $WILDCARD === $k ) 
+                                {
+                                    $k = implode('.', array_slice($p, $i));
+                                    foreach(array_keys($o) as $key)
+                                        $stack[] = array(&$o, "{$key}.{$k}");
+                                }
+                                elseif ( isset($o[$k]) ) 
+                                {
+                                    $o =& $o[$k];
+                                }
+                            }
+                            else break; // key does not exist
+                        }
+                        else
+                        {
+                            if ( is_object($o) ) 
+                            {
+                                if ( $WILDCARD === $k )
+                                {
+                                    foreach(array_keys((array)$o) as $k) unset( $o->{$k} );
+                                }
+                                elseif ( isset($o->{$k}) )
+                                {
+                                    unset( $o->{$k} );
+                                }
+                            }
+                            elseif ( is_array($o) ) 
+                            {
+                                if ( $WILDCARD === $k )
+                                {
+                                    foreach(array_keys($o) as $k) unset( $o[$k] );
+                                }
+                                elseif ( isset($o[$k]) )
+                                {
+                                    unset( $o[$k] );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return $this;
+    }
+    
     public function types( $types )
     {
         if ( !$types || empty( $types ) ) return $this;
