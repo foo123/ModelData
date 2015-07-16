@@ -339,9 +339,53 @@ class ModelData
         return $this;
     }
     
-    public function data( $data=array() )
+    public function data( $data )
     {
-        $this->Data = $data;
+        if ( 0 < func_num_args( ) )
+        {
+            $this->Data = $data;
+            return $this;
+        }
+        return $this->Data;
+    }
+    
+    public function defaults( $defaults )
+    {
+        if ( !empty( $defaults) )
+        {
+            $data =& $this->Data;
+            $is_object = is_object( $data ); $is_array = is_array( $data );
+            if ( $is_object || $is_array )
+            {
+                foreach((array)$defaults as $k=>$v)
+                {
+                    if ( $is_object ) 
+                    {
+                        if ( !isset( $data->{$k} ) )
+                        {
+                            $data->{$k} = $v;
+                        }
+                        elseif ( (is_array( $data->{$k} ) || is_object( $data->{$k} )) && 
+                        (is_array( $v ) || is_object( $v )) )
+                        {
+                            $data->{$k} = self::do_defaults( $this, $data->{$k}, $v );
+                        }
+                    }
+                    else/*if ( $is_array )*/
+                    {
+                        if ( !isset($data[$k]) )
+                        {
+                            $data[$k] = $v;
+                        }
+                        elseif ( (is_array( $data[$k] ) || is_object( $data[$k] )) && 
+                        (is_array( $v ) || is_object( $v )) )
+                        {
+                            $data[$k] = self::do_defaults( $this, $data[$k], $v );
+                        }
+                    }
+                }
+            }
+        }
         return $this;
     }
     
@@ -409,6 +453,184 @@ class ModelData
             }
         }
         return $result;
+    }
+    
+    public static function walk_and_get( $obj, $dottedKey ) 
+    {
+        if ( empty($type) ) return null;
+        $obj = array( $obj );
+        $p = explode( '.', $dottedKey );
+        $i = 0; $l = count( $p );
+        while ( $i < $l )
+        {
+            $k = $p[$i++];
+            if ( $i < $l ) 
+            {
+                $obj = self::get_next( $obj, $k );
+                if ( !$obj || empty($obj) ) return null;
+            }
+            else 
+            {
+                $obj = self::get_value( $obj, $k );
+                if ( $obj && !empty($obj) ) 
+                {
+                    return $obj;
+                }
+            }
+        }
+        return null;
+    }
+    
+    public static function do_defaults( $model, $data, $defaults )
+    {
+        $is_object = is_object( $data ); $is_array = is_array( $data );
+        if ( $is_object || $is_array )
+        {
+            foreach((array)$defaults as $k=>$v)
+            {
+                if ( $is_object ) 
+                {
+                    if ( !isset($data->{$k}) )
+                    {
+                        $data->{$k} = $v;
+                    }
+                    elseif ( (is_array( $data->{$k} ) || is_object( $data->{$k} )) && 
+                    (is_array( $v ) || is_object( $v )) )
+                    {
+                        $data->{$k} = self::do_defaults( $this, $data->{$k}, $v );
+                    }
+                }
+                else/*if ( $is_array )*/
+                {
+                    if ( !isset($data[$k]) )
+                    {
+                        $data[$k] = $v;
+                    }
+                    elseif ( (is_array( $data[$k] ) || is_object( $data[$k] )) && 
+                    (is_array( $v ) || is_object( $v )) )
+                    {
+                        $data[$k] = self::do_defaults( $this, $data[$k], $v );
+                    }
+                }
+            }
+        }
+        return $data;
+    }
+    
+    public static function do_typecast( $model, $dottedKey, $data )
+    {
+        $typecaster = self::walk_and_get( $model->Types, $dottedKey );
+        if ( $typecaster && is_callable( $typecaster ) )
+        {
+            return call_user_func( $typecaster, $data, $dottedKey, $model );
+        }
+        else
+        {
+            $is_object = is_object( $data ); $is_array = is_array( $data );
+            if ( !empty($data) && ($is_object || $is_array) )
+            {
+                foreach((array)$data as $k=>$v)
+                {
+                    $v = self::do_typecast( $model, "{$dottedKey}.{$k}", $v );
+                    if ( $is_object ) $data->{$k} = $v;
+                    else $data[$k] = $v;
+                }
+            }
+        }
+        return $data;
+    }
+    
+    public static function do_validate( $model, $dottedKey, $data, $breakOnFirstError=false )
+    {
+        $result = (object)array(
+            'isValid' => true,
+            'errors' => array()
+        );
+        
+        $validator = self::walk_and_get( $model->Validators, $dottedKey );
+        if ( $validator && is_callable( $validator ) )
+        {
+            $res = call_user_func( $validator, $data, $dottedKey, $model );
+            if ( !$res )
+            {
+                $result->isValid = false;
+                $result->errors[] = $dottedKey;
+            }
+        }
+        else
+        {
+            $is_object = is_object( $data ); $is_array = is_array( $data );
+            if ( !empty($data) && ($is_object || $is_array) )
+            {
+                foreach((array)$data as $k=>$v)
+                {
+                    $res = self::do_validate( $model, "{$dottedKey}.{$k}", $v );
+                    if ( !$res->isValid )
+                    {
+                        $result->isValid = false;
+                        $result->errors = array_merge($result->errors, $res->errors);
+                        if ( $breakOnFirstError ) return $result;
+                    }
+                }
+            }
+        }
+        return $result;
+    }
+    
+    public static function walk_and_add( &$obj, $p, $v ) 
+    {
+        $o =& $obj; 
+        $i = 0; $l = count($p);
+        while ( $i < $l )
+        {
+            $k = $p[$i++];
+            if ( !isset($o[$k]) ) $o[ $k ] = self::Node( );
+            $o =& $o[ $k ];
+            if ( $i < $l ) 
+            {
+                $o =& $o->n;
+            }
+            else 
+            {
+                $o->v = $v;
+            }
+        }
+    }
+    
+    public static function add_type_validator( $model, $type, $dottedKey, $value ) 
+    {
+        if ( !$value || empty( $value ) ) return;
+        
+        if ( is_object( $value ) ) $value = (array)$value;
+        
+        if ( is_string( $value ) )
+        {
+            if ( self::TYPECASTER===$type && is_callable(array(__CLASS__, "TYPE_$value")) )
+            {
+                $value = array(__CLASS__, "TYPE_$value");
+                self::walk_and_add( $model->Types, explode('.', $dottedKey), call_user_func( $value ) );
+            }
+            elseif ( self::VALIDATOR===$type && is_callable(array(__CLASS__, "VALIDATE_$value")) )
+            {
+                $value = array(__CLASS__, "VALIDATE_$value");
+                self::walk_and_add( $model->Validators, explode('.', $dottedKey), call_user_func( $value ) );
+            }
+        }
+        
+        elseif ( is_array( $value ) && 2 === count($value) && is_callable( $value ) )
+        {
+            if ( self::TYPECASTER===$type )
+                self::walk_and_add( $model->Types, explode('.', $dottedKey), $value );
+            elseif ( self::VALIDATOR===$type )
+                self::walk_and_add( $model->Validators, explode('.', $dottedKey), $value );
+        }
+        
+        else if ( is_array( $value ) )
+        {
+            // nested keys given, recurse
+            foreach ( $value as $k=>$v ) 
+                self::add_type_validator( $model, $type, "{$dottedKey}.{$k}", $v );
+        }
     }
     
     //
@@ -700,148 +922,6 @@ class ModelData
             }
         }
         return null;
-    }
-    
-    public static function walk_and_get( $obj, $dottedKey ) 
-    {
-        if ( empty($type) ) return null;
-        $obj = array( $obj );
-        $p = explode( '.', $dottedKey );
-        $i = 0; $l = count( $p );
-        while ( $i < $l )
-        {
-            $k = $p[$i++];
-            if ( $i < $l ) 
-            {
-                $obj = self::get_next( $obj, $k );
-                if ( !$obj || empty($obj) ) return null;
-            }
-            else 
-            {
-                $obj = self::get_value( $obj, $k );
-                if ( $obj && !empty($obj) ) 
-                {
-                    return $obj;
-                }
-            }
-        }
-        return null;
-    }
-    
-    public static function do_typecast( $model, $dottedKey, $data )
-    {
-        $typecaster = self::walk_and_get( $model->Types, $dottedKey );
-        if ( $typecaster && is_callable( $typecaster ) )
-        {
-            return call_user_func( $typecaster, $data, $dottedKey, $model );
-        }
-        else
-        {
-            $is_object = is_object( $data ); $is_array = is_array( $data );
-            if ( !empty($data) && ($is_object || $is_array) )
-            {
-                foreach((array)$data as $k=>$v)
-                {
-                    $v = self::do_typecast( $model, "{$dottedKey}.{$k}", $v );
-                    if ( $is_object ) $data->{$k} = $v;
-                    else $data[$k] = $v;
-                }
-            }
-        }
-        return $data;
-    }
-    
-    public static function do_validate( $model, $dottedKey, $data, $breakOnFirstError=false )
-    {
-        $result = (object)array(
-            'isValid' => true,
-            'errors' => array()
-        );
-        
-        $validator = self::walk_and_get( $model->Validators, $dottedKey );
-        if ( $validator && is_callable( $validator ) )
-        {
-            $res = call_user_func( $validator, $data, $dottedKey, $model );
-            if ( !$res )
-            {
-                $result->isValid = false;
-                $result->errors[] = $dottedKey;
-            }
-        }
-        else
-        {
-            $is_object = is_object( $data ); $is_array = is_array( $data );
-            if ( !empty($data) && ($is_object || $is_array) )
-            {
-                foreach((array)$data as $k=>$v)
-                {
-                    $res = self::do_validate( $model, "{$dottedKey}.{$k}", $v );
-                    if ( !$res->isValid )
-                    {
-                        $result->isValid = false;
-                        $result->errors = array_merge($result->errors, $res->errors);
-                        if ( $breakOnFirstError ) return $result;
-                    }
-                }
-            }
-        }
-        return $result;
-    }
-    
-    public static function walk_and_add( &$obj, $p, $v ) 
-    {
-        $o =& $obj; 
-        $i = 0; $l = count($p);
-        while ( $i < $l )
-        {
-            $k = $p[$i++];
-            if ( !isset($o[$k]) ) $o[ $k ] = self::Node( );
-            $o =& $o[ $k ];
-            if ( $i < $l ) 
-            {
-                $o =& $o->n;
-            }
-            else 
-            {
-                $o->v = $v;
-            }
-        }
-    }
-    
-    public static function add_type_validator( $model, $type, $dottedKey, $value ) 
-    {
-        if ( !$value || empty( $value ) ) return;
-        
-        if ( is_object( $value ) ) $value = (array)$value;
-        
-        if ( is_string( $value ) )
-        {
-            if ( self::TYPECASTER===$type && is_callable(array(__CLASS__, "TYPE_$value")) )
-            {
-                $value = array(__CLASS__, "TYPE_$value");
-                self::walk_and_add( $model->Types, explode('.', $dottedKey), call_user_func( $value ) );
-            }
-            elseif ( self::VALIDATOR===$type && is_callable(array(__CLASS__, "VALIDATE_$value")) )
-            {
-                $value = array(__CLASS__, "VALIDATE_$value");
-                self::walk_and_add( $model->Validators, explode('.', $dottedKey), call_user_func( $value ) );
-            }
-        }
-        
-        elseif ( is_array( $value ) && 2 === count($value) && is_callable( $value ) )
-        {
-            if ( self::TYPECASTER===$type )
-                self::walk_and_add( $model->Types, explode('.', $dottedKey), $value );
-            elseif ( self::VALIDATOR===$type )
-                self::walk_and_add( $model->Validators, explode('.', $dottedKey), $value );
-        }
-        
-        else if ( is_array( $value ) )
-        {
-            // nested keys given, recurse
-            foreach ( $value as $k=>$v ) 
-                self::add_type_validator( $model, $type, "{$dottedKey}.{$k}", $v );
-        }
     }
     
     public static function by_length_desc( $a, $b )
