@@ -339,7 +339,7 @@ class ModelData
         return $this;
     }
     
-    public function data( $data )
+    public function data( $data=null )
     {
         if ( 0 < func_num_args( ) )
         {
@@ -540,7 +540,7 @@ class ModelData
     
     public static function walk_and_get( $obj, $dottedKey ) 
     {
-        if ( empty($type) ) return null;
+        if ( empty($obj) ) return null;
         $obj = array( $obj );
         $p = explode( '.', $dottedKey );
         $i = 0; $l = count( $p );
@@ -965,7 +965,7 @@ class ModelData
     {
         if ( !$a || empty($a) ) return null;
         $b = array( ); 
-        $l = count(a);
+        $l = count( $a );
         $WILDCARD = self::WILDCARD;
         for ($i=0; $i<$l; $i++)
         {
@@ -979,12 +979,12 @@ class ModelData
         return empty($b) ? null : $b;
     }
     
-    public static function get_value( $a, $k ) 
+    public static function get_value( $a, $k=null ) 
     {
         if ( !$a || empty($a) ) return null;
         $l = count($a);
         $WILDCARD = self::WILDCARD;
-        if ( $k )
+        if ( null!==$k )
         {
             for ($i=0; $i<$l; $i++)
             {
@@ -1001,7 +1001,7 @@ class ModelData
             for ($i=0; $i<$l; $i++)
             {
                 $ai = $a[ $i ];
-                if ( $ai && $ai->v ) return $ai->v;
+                if ( $ai && isset($ai->v) ) return $ai->v;
             }
         }
         return null;
