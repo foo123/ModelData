@@ -9,47 +9,112 @@
 **/
 if ( !class_exists("ModelData") )
 {
-
-/*class ModelField
+class ModelField
 {
-    public $f=null;
-    public static function _($f)
-    {
-        return new self($f);
-    }
-    public function __construct($f)
+    public $f = null;
+
+    public function __construct( $f )
     {
         $this->f = $f;
     }
-    public function __destruct()
+    public function __destruct( )
     {
         $this->dispose( );
     }
-    public function dispose()
+    public function dispose( )
     {
         $this->f = null;
         return $this;
     }
-}*/
+}
+
 class ModelTypeCaster
 {
-    private $v = null;
-    public function __construct($v=null)
+    public static $custom = array( );
+    public $typecaster = null;
+    public $v = null;
+    
+    public static function add( $type, $caster )
     {
-        $this->v = $v;
+        if ( $type && $caster && is_callable($caster) )
+            self::$custom[ strtolower($type) ] = $caster;
     }
-    public function __destruct()
+    
+    public static function del( $type )
     {
+        if ( $type && isset(self::$custom[ strtolower($type) ]) )
+            unset(self::$custom[ strtolower($type) ]);
+    }
+    
+    public function __construct( $typecaster=null, $args=null )
+    {
+        $this->typecaster = is_string($typecaster) ? strtolower($typecaster) : null;
+        
+        switch( $this->typecaster )
+        {
+            case 'composite':
+                if ( $args && is_array($args[0]) && !is_callable($args[0]) ) $args = $args[ 0 ];
+                break;
+            case 'clamp':
+                if ( $args  ) 
+                {
+                    $m = $args[0]; $M = $args[1];
+                    // swap
+                    if ( $m > $M ) { $args[0] = $M; $args[1] = $m; }
+                }
+                break;
+            case 'pad':
+                $args = (array)$args;
+                if ( $args ) 
+                {
+                    if ( !isset($args[2]) || !$args[2] ) $args[2] = "L";
+                }
+                break;
+            case 'datetime':
+                $args = (array)$args;
+                if ( !$args  ) $args = array("Y-m-d", null);
+                if ( !isset($args[0]) || !$args[0] ) $args[0] = "Y-m-d";
+                if ( !isset($args[1]) || !$args[1] ) $args[1] = null;
+                break;
+        }
+        
+        $this->v = $args;
+    }
+    
+    public function __destruct( )
+    {
+        $this->typecaster = null;
         $this->v = null;
     }
-    public function typecast_composite( $v, $k, $m )
+    
+    public function typecast( $v, $k, $m )
+    {
+        $typecaster = $this->typecaster;
+        if ( $typecaster ) 
+        {
+            if ( isset(self::$custom[$typecaster]) )
+            {
+                $typecaster = self::$custom[$typecaster];
+                return call_user_func( $typecaster, $v, $k, $m );
+            }
+            elseif ( is_callable(array($this, "t_{$typecaster}")) )
+            {
+                $typecaster = "t_{$typecaster}";
+                return $this->{$typecaster}( $v, $k, $m );
+            }
+        }
+        return $v;
+    }
+    
+    public function t_composite( $v, $k, $m )
     {
         $typecasters = $this->v;
         $l = count($typecasters);
         while ( $l-- ) $v = call_user_func($typecasters[$l], $v, $k, $m);
         return $v;
     }
-    public function typecast_fields( $v, $k, $m )
+    
+    public function t_fields( $v, $k, $m )
     {
         $typesPerField = $this->v;
         foreach ($typesPerField as $field=>$type)
@@ -58,13 +123,15 @@ class ModelTypeCaster
         }
         return $v;
     }
-    public function typecast_default( $v, $k, $m )
+    
+    public function t_default( $v, $k, $m )
     {
         $defaultValue = $this->v;
         if ( !$v || (is_string($v) && !strlen(trim($v)))  ) $v = $defaultValue;
         return $v;
     }
-    public function typecast_bool( $v, $k, $m )
+    
+    public function t_bool( $v, $k, $m )
     {
         // handle string representation of booleans as well
         if ( is_string($v) && strlen($v) )
@@ -75,59 +142,59 @@ class ModelTypeCaster
         return (bool)($v); 
     }
     
-    public function typecast_int( $v, $k, $m ) 
+    public function t_int( $v, $k, $m ) 
     { 
         // convert NaN to 0 if needed
         $v = intval($v, 10);
         return !$v ? 0 : $v;
     }
     
-    public function typecast_float( $v, $k, $m ) 
+    public function t_float( $v, $k, $m ) 
     { 
         // convert NaN to 0 if needed
         $v = floatval($v, 10);
         return !$v ? 0.0 : $v;
     }
     
-    public function typecast_trim( $v, $k, $m ) 
+    public function t_trim( $v, $k, $m ) 
     { 
         return trim(strval($v));
     }
     
-    public function typecast_lcase( $v, $k, $m ) 
+    public function t_lcase( $v, $k, $m ) 
     { 
         return strtolower(strval($v));
     }
     
-    public function typecast_ucase( $v, $k, $m ) 
+    public function t_ucase( $v, $k, $m ) 
     { 
         return strtoupper(strval($v));
     }
             
-    public function typecast_str( $v, $k, $m ) 
+    public function t_str( $v, $k, $m ) 
     { 
         return strval($v);
     }
     
-    public function typecast_min( $v, $k, $m ) 
+    public function t_min( $v, $k, $m ) 
     {  
         $min = $this->v;
         return ($v < $min) ? $min : $v; 
     }
     
-    public function typecast_max( $v, $k, $m ) 
+    public function t_max( $v, $k, $m ) 
     {  
         $max = $this->v;
         return ($v > $max) ? $max : $v; 
     }
     
-    public function typecast_clamp( $v, $k, $m ) 
+    public function t_clamp( $v, $k, $m ) 
     {  
         $min = $this->v[0]; $max = $this->v[1];
         return ($v < $min) ? $min : (($v > $max) ? $max : $v); 
     }
     
-    public function typecast_pad( $v, $k, $m ) 
+    public function t_pad( $v, $k, $m ) 
     { 
         $pad_char = $this->v[0]; 
         $pad_size = $this->v[1]; 
@@ -146,7 +213,7 @@ class ModelTypeCaster
             {
                 $vs .= str_repeat($pad_char, $n);
             }
-            elseif ( 'L' === $pad_type )
+            else/*if ( 'L' === $pad_type )*/
             {
                 $vs = str_repeat($pad_char, $n) . $vs;
             }
@@ -154,26 +221,156 @@ class ModelTypeCaster
         return $vs;
     }
     
-    public function typecast_datetime( $v, $k, $m ) 
+    public function t_datetime( $v, $k, $m ) 
     {
-        $format = $this->v[0];
-        $locale = $this->v[1];
+        $format = $this->v[0]; $locale = $this->v[1];
         // TODO: localisation
         return date( $format, $v ); 
     }
 }
+
 class ModelValidator
 {
-    private $v = null;
-    public function __construct($v=null)
+    public static $custom = array( );
+    public $validator = null;
+    public $v = null;
+    
+    public static function add( $type, $validator )
     {
-        $this->v = $v;
+        if ( $type && $validator && is_callable($validator) )
+            self::$custom[ strtolower($type) ] = $validator;
     }
-    public function __destruct()
+    
+    public static function del( $type )
     {
+        if ( $type && isset(self::$custom[ strtolower($type) ]) )
+            unset(self::$custom[ strtolower($type) ]);
+    }
+    
+    public function __construct( $validator=null, $args=null )
+    {
+        $this->validator = is_string($validator) ? strtolower($validator) : null;
+        
+        switch( $this->validator )
+        {
+            case 'minlen':
+            case 'maxlen':
+                $args = $args ? $args : 0;
+                break;
+            case 'min_items':
+            case 'max_items':
+                $args = (array)$args;
+                $args[0] = intval($args[0], 10);
+                if ( !isset($args[1]) || !$args[1] || !is_callable($args[1]) ) $args[1] = null;
+                break;
+            case 'equal':
+            case 'not_equal':
+            case 'greater_than':
+            case 'less_than':
+                $args = (array)$args;
+                if ( !isset($args[1]) ) $args[1] = true; // strict
+                break;
+            case 'between':
+            case 'not_between':
+                $args = (array)$args;
+                if ( !isset($args[2]) ) $args[2] = true; // strict
+                $m = $args[0]; $M = $args[1];
+                // swap
+                if ( !($m instanceof ModelField) && !($M instanceof ModelField) && ($m > $M) ) { $args[0] = $M; $args[1] = $m; }
+                break;
+            case 'in':
+            case 'not_in':
+                $args = (array)$args;
+                break;
+            case 'datetime':
+                $args = (array)$args;
+                if ( !$args  ) $args = array("Y-m-d", null);
+                if ( !isset($args[0]) || !$args[0] ) $args[0] = "Y-m-d";
+                if ( !isset($args[1]) || !$args[1] ) $args[1] = null;
+                $args = ModelData::get_date_pattern( $args[0], $args[1] );
+                break;
+        }
+        
+        $this->v = $args;
+    }
+    
+    public function __destruct( )
+    {
+        $this->validator = null;
         $this->v = null;
     }
-    public function validate_fields( $v, $k, $m )
+    
+    public function AND_( $validator )
+    {
+        return new ModelValidator('and', array($this, $validator));
+    }
+    
+    public function OR_( $validator )
+    {
+        return new ModelValidator('or', array($this, $validator));
+    }
+    
+    public function XOR_( $validator )
+    {
+        return new ModelValidator('xor', array($this, $validator));
+    }
+    
+    public function NOT_( )
+    {
+        return new ModelValidator('not', $this);
+    }
+    
+    public function validate( $v, $k, $m )
+    {
+        $validator = $this->validator;
+        if ( $validator ) 
+        {
+            if ( in_array($validator, array('and','or','xor','not')) )
+            {
+                $validator = "v_{$validator}";
+                return $this->{$validator}( $v, $k, $m );
+            }
+            elseif ( isset(self::$custom[$validator]) )
+            {
+                $validator = self::$custom[$validator];
+                return call_user_func( $validator, $v, $k, $m );
+            }
+            elseif ( is_callable(array($this, "v_{$validator}")) )
+            {
+                $validator = "v_{$validator}";
+                return $this->{$validator}( $v, $k, $m );
+            }
+        }
+        return true;
+    }
+    
+    public function v_and( $v, $k, $m )
+    {
+        $validator = $this->v;
+        return $validator[0]->validate($v, $k, $m) && $validator[1]->validate($v, $k, $m);
+    }
+    
+    public function v_or( $v, $k, $m )
+    {
+        $validator = $this->v;
+        return $validator[0]->validate($v, $k, $m) || $validator[1]->validate($v, $k, $m);
+    }
+    
+    public function v_xor( $v, $k, $m )
+    {
+        $validator = $this->v;
+        $v0 = $validator[0]->validate($v, $k, $m);
+        $v1 = $validator[1]->validate($v, $k, $m);
+        return ($v0 && !$v1) || ($v1 && !$v0);
+    }
+    
+    public function v_not( $v, $k, $m )
+    {
+        $validator = $this->v;
+        return !$validator->validate($v, $k, $m);
+    }
+    
+    public function v_fields( $v, $k, $m )
     {
         $validatorsPerField = $this->v;
         foreach ($validatorsPerField as $field=>$validator)
@@ -183,103 +380,163 @@ class ModelValidator
         }
         return true;
     }
-    public function validate_numeric( $v, $k, $m )
+    
+    public function v_numeric( $v, $k, $m )
     {
         return is_numeric( $v );
     }
-    public function validate_empty( $v, $k, $m )
+    
+    public function v_empty( $v, $k, $m )
     {
         return (bool)(!$v || !strlen(trim(strval($v))));
     }
-    public function validate_not_empty( $v, $k, $m )
+    
+    public function v_not_empty( $v, $k, $m )
     {
         return (bool)($v && strlen(trim(strval($v)))>0);
     }
-    public function validate_maxlen( $v, $k, $m )
+    
+    public function v_maxlen( $v, $k, $m )
     {
         $len = $this->v;
         return (bool)(strlen($v)<=$len);
     }
-    public function validate_minlen( $v, $k, $m )
+    
+    public function v_minlen( $v, $k, $m )
     {
         $len = $this->v;
         return (bool)(strlen($v)>=$len);
     }
-    public function validate_match( $v, $k, $m )
+    
+    public function v_match( $v, $k, $m )
     {
         $regex_pattern = $this->v;
         $matches = array();
         return (bool)preg_match($regex_pattern, $v, $matches);
     }
-    public function validate_not_match( $v, $k, $m )
+    
+    public function v_not_match( $v, $k, $m )
     {
         $regex_pattern = $this->v;
         $matches = array();
         return (bool)(!preg_match($regex_pattern, $v, $matches));
     }
-    public function validate_equal( $v, $k, $m )
+    
+    public function v_equal( $v, $k, $m )
     {
         $val = $this->v[0]; $strict = $this->v[1];
+        if ( $val instanceof ModelField ) 
+        {
+            $val = $m->get( $val->f );
+            $val = empty($val) ? null : $val[0];
+        }
         return $strict ? ($val === $v) : ($val == $v);
     }
-    public function validate_not_equal( $v, $k, $m )
+    
+    public function v_not_equal( $v, $k, $m )
     {
         $val = $this->v[0]; $strict = $this->v[1];
+        if ( $val instanceof ModelField ) 
+        {
+            $val = $m->get( $val->f );
+            $val = empty($val) ? null : $val[0];
+        }
         return $strict ? ($val !== $v) : ($val != $v);
     }
-    public function validate_greater_than( $v, $k, $m )
+    
+    public function v_greater_than( $v, $k, $m )
     {
         $min = $this->v[0]; $strict = $this->v[1];
+        if ( $min instanceof ModelField ) 
+        {
+            $min = $m->get( $min->f );
+            $min = empty($min) ? null : $min[0];
+        }
         return $strict ? ($min < $v) : ($min <= $v);
     }
-    public function validate_less_than( $v, $k, $m )
+    
+    public function v_less_than( $v, $k, $m )
     {
         $max = $this->v[0]; $strict = $this->v[1];
+        if ( $max instanceof ModelField ) 
+        {
+            $max = $m->get( $max->f );
+            $max = empty($max) ? null : $max[0];
+        }
         return $strict ? ($max > $v) : ($max >= $v);
     }
-    public function validate_between( $v, $k, $m )
+    
+    public function v_between( $v, $k, $m )
     {
         $min =$this->v[0]; $max = $this->v[1]; $strict = $this->v[2];
+        if ( $min instanceof ModelField ) 
+        {
+            $min = $m->get( $min->f );
+            $min = empty($min) ? null : $min[0];
+        }
+        if ( $max instanceof ModelField ) 
+        {
+            $max = $m->get( $max->f );
+            $max = empty($max) ? null : $max[0];
+        }
         return $strict ? (($min < $v) && ($v < $max)) : (($min <= $v) && ($v <= $max));
     }
-    public function validate_not_between( $v, $k, $m )
+    
+    public function v_not_between( $v, $k, $m )
     {
         $min =$this->v[0]; $max = $this->v[1]; $strict = $this->v[2];
+        if ( $min instanceof ModelField ) 
+        {
+            $min = $m->get( $min->f );
+            $min = empty($min) ? null : $min[0];
+        }
+        if ( $max instanceof ModelField ) 
+        {
+            $max = $m->get( $max->f );
+            $max = empty($max) ? null : $max[0];
+        }
         return $strict ? (($min > $v) || ($v > $max)) : (($min >= $v) || ($v >= $max));
     }
-    public function validate_in( $v, $k, $m )
+    
+    public function v_in( $v, $k, $m )
     {
         $vals = $this->v;
         return in_array($v, $vals);
     }
-    public function validate_not_in( $v, $k, $m )
+    
+    public function v_not_in( $v, $k, $m )
     {
         $vals = $this->v;
         return !in_array($v, $vals);
     }
-    public function validate_min_items( $v, $k, $m )
+    
+    public function v_min_items( $v, $k, $m )
     {
         $limit = $this->v[0]; $item_filter = $this->v[1];
         return $item_filter ? ($limit <= count(array_filter($v, $item_filter))) : ($limit <= count($v));
     }
-    public function validate_max_items( $v, $k, $m )
+    
+    public function v_max_items( $v, $k, $m )
     {
         $limit = $this->v[0]; $item_filter = $this->v[1];
         return $item_filter ? ($limit >= count(array_filter($v, $item_filter))) : ($limit >= count($v));
     }
-    public function validate_email( $v, $k, $m )
+    
+    public function v_email( $v, $k, $m )
     {
         $email_pattern = '/^(([^<>()[\\]\\\\.,;:\\s@\\"]+(\\.[^<>()[\\]\\\\.,;:\\s@\\"]+)*)|(\\".+\\"))@((\\[[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\])|(([a-zA-Z\\-0-9]+\\.)+[a-zA-Z]{2,}))$/';
         $matches = array( );
         return (bool)preg_match($email_pattern, $v, $matches);
     }
-    public function validate_url( $v, $k, $m )
+    
+    public function v_url( $v, $k, $m )
     {
         $url_pattern = '/^(?!mailto:)(?:(?:http|https|ftp)://)(?:\\S+(?::\\S*)?@)?(?:(?:(?:[1-9]\\d?|1\\d\\d|2[01]\\d|22[0-3])(?:\\.(?:1?\\d{1,2}|2[0-4]\\d|25[0-5])){2}(?:\\.(?:[0-9]\\d?|1\\d\\d|2[0-4]\\d|25[0-4]))|(?:(?:[a-z\\u00a1-\\uffff0-9]+-?)*[a-z\\u00a1-\\uffff0-9]+)(?:\\.(?:[a-z\\u00a1-\\uffff0-9]+-?)*[a-z\\u00a1-\\uffff0-9]+)*(?:\\.(?:[a-z\\u00a1-\\uffff]{2,})))|localhost)(?::\\d{2,5})?(?:(/|\\?|#)[^\\s]*)?$/i';
         $matches = array( );
         return (bool)preg_match($url_pattern, $v, $matches);
     }
-    public function validate_datetime( $v, $k, $m )
+    
+    public function v_datetime( $v, $k, $m )
     {
         $date_pattern = $this->v;
         $matches = array( );
@@ -300,6 +557,115 @@ class ModelData
     public $Types = null;
     public $Validators = null;
     
+    // Array multi - sorter utility
+    // returns a sorter that can (sub-)sort by multiple (nested) fields 
+    // each ascending or descending independantly
+    public static function Sorter( /* var args here */ ) 
+    {
+        $args = func_get_args( ); $l = count($args);
+        $ASC = '|^'; $DESC = '|v';
+        // |^ after a (nested) field indicates ascending sorting (default), 
+        // example "a.b.c|^"
+        // |v after a (nested) field indicates descending sorting, 
+        // example "b.c.d|v"
+        if ( $l )
+        {
+            $step = 1;
+            $sorter = array();
+            $sorter_args = array();
+            $filter_args = array(); 
+            for ($i=$l-1; $i>=0; $i--)
+            {
+                $field = $args[$i];
+                // if is array, it contains a filter function as well
+                array_unshift($filter_args, '$f'.$i);
+                if ( is_array($field) )
+                {
+                    array_unshift($sorter_args, $field[1]);
+                    $field = $field[0];
+                }
+                else
+                {
+                    array_unshift($sorter_args, null);
+                }
+                $dir = substr($field,-2);
+                if ( $DESC === $dir ) 
+                {
+                    $desc = true;
+                    $field = substr($field,0,-2);
+                }
+                elseif ( $ASC === $dir )
+                {
+                    $desc = false;
+                    $field = substr($field,0,-2);
+                }
+                else
+                {
+                    // default ASC
+                    $desc = false;
+                }
+                $field = strlen($field) ? '["' . implode('"]["', explode('.', $field)) . '"]' : '';
+                $a = '$a'.$field; $b = '$b'.$field;
+                if ( $sorter_args[0] ) 
+                {
+                    $a = 'call_user_func(' . $filter_args[0] . ',' . $a . ')';
+                    $b = 'call_user_func(' . $filter_args[0] . ',' . $b . ')';
+                }
+                $lt = $desc ?(''.$step):('-'.$step); $gt = $desc ?('-'.$step):(''.$step);
+                array_unshift($sorter, "(".$a." < ".$b." ? ".$lt." : (".$a." > ".$b." ? ".$gt." : 0))");
+                $step <<= 1;
+            }
+            // use actual php anonynous function/closure
+            // needs PHP 5.3+
+            $sorter_factory = create_function(implode(',',$filter_args), implode("\n", array(
+                '$sorter = function($a,$b) use('.implode(',',$filter_args).') {',
+                '    return ('.implode(' + ', $sorter).');',
+                '};',
+                'return $sorter;'
+            )));
+            return call_user_func_array($sorter_factory, $sorter_args);
+        }
+        else
+        {
+            $a = '$a'; $b = '$b'; $lt = '-1'; $gt = '1';
+            $sorter = "".$a." < ".$b." ? ".$lt." : (".$a." > ".$b." ? ".$gt." : 0)";
+            return create_function('$a,$b', 'return ('.$sorter.');');
+        }
+    }
+
+    public static function Field( $f )
+    {
+        return new ModelField( $f );
+    }
+    
+    public static function TYPE( $type )
+    {
+        if ( $type )
+        {
+            $args = func_get_args( );
+            array_shift( $args );
+            $argslen = count( $args );
+            if ( 1 === $argslen ) $args = $args[0];
+            elseif ( !$argslen ) $args = null;
+            return new ModelTypeCaster( $type, $args );
+        }
+        return null;
+    }
+    
+    public static function VALIDATOR( $validator )
+    {
+        if ( $validator )
+        {
+            $args = func_get_args( );
+            array_shift( $args );
+            $argslen = count( $args );
+            if ( 1 === $argslen ) $args = $args[0];
+            elseif ( !$argslen ) $args = null;
+            return new ModelValidator( $validator, $args );
+        }
+        return null;
+    }
+    
     public static function init( )
     {
         static $inited = false;
@@ -319,7 +685,7 @@ class ModelData
         }
     }
     
-    public function __construct( $data=array() )
+    public function __construct( $data=array( ) )
     {
         $this->Types = array( );
         $this->Validators = array( );
@@ -339,7 +705,7 @@ class ModelData
         return $this;
     }
     
-    public function data( $data=null )
+    public function data( $data=array( ) )
     {
         if ( 0 < func_num_args( ) )
         {
@@ -475,7 +841,7 @@ class ModelData
         return $results;
     }
     
-    public function remove( $fields )
+    public function del( $fields )
     {
         if ( !$fields || empty( $fields ) ) return $this;
         $data =& $this->Data;
@@ -569,10 +935,9 @@ class ModelData
     public function types( $types )
     {
         if ( !$types || empty( $types ) ) return $this;
-        if ( is_object( $types ) ) $types = (array)$types;
-        if ( is_array( $types ) )
+        if ( is_array( $types ) || is_object( $types ) )
         {
-            foreach ($types as $k=>$t) 
+            foreach ((array)$types as $k=>$t) 
                 self::add_type_validator( $this, self::TYPECASTER, $k, $t );
         }
         return $this;
@@ -581,10 +946,9 @@ class ModelData
     public function validators( $validators )
     {
         if ( !$validators || empty( $validators ) ) return $this;
-        if ( is_object( $validators ) ) $validators = (array)$validators;
-        if ( is_array( $validators ) )
+        if ( is_array( $validators ) || is_object( $validators ) )
         {
-            foreach ($validators as $k=>$v) 
+            foreach ((array)$validators as $k=>$v) 
                 self::add_type_validator( $this, self::VALIDATOR, $k, $v );
         }
         return $this;
@@ -697,9 +1061,10 @@ class ModelData
     public static function do_typecast( $model, $dottedKey, $data )
     {
         $typecaster = self::walk_and_get( $model->Types, $dottedKey );
-        if ( $typecaster && is_callable( $typecaster ) )
+        if ( $typecaster /*&& ($typecaster instanceof ModelTypeCaster)*//*is_callable( $typecaster )*/ )
         {
-            return call_user_func( $typecaster, $data, $dottedKey, $model );
+            //return call_user_func( $typecaster, $data, $dottedKey, $model );
+            return $typecaster->typecast( $data, $dottedKey, $model );
         }
         else
         {
@@ -725,9 +1090,10 @@ class ModelData
         );
         
         $validator = self::walk_and_get( $model->Validators, $dottedKey );
-        if ( $validator && is_callable( $validator ) )
+        if ( $validator /*&& ($validator instanceof ModelValidator)*//*is_callable( $validator )*/ )
         {
-            $res = call_user_func( $validator, $data, $dottedKey, $model );
+            //$res = call_user_func( $validator, $data, $dottedKey, $model );
+            $res = $validator->validate( $data, $dottedKey, $model );
             if ( !$res )
             {
                 $result->isValid = false;
@@ -761,7 +1127,7 @@ class ModelData
         while ( $i < $l )
         {
             $k = $p[$i++];
-            if ( !isset($o[$k]) ) $o[ $k ] = self::Node( );
+            if ( !isset($o[$k]) ) $o[ $k ] = self::node( );
             $o =& $o[ $k ];
             if ( $i < $l ) 
             {
@@ -778,276 +1144,25 @@ class ModelData
     {
         if ( !$value || empty( $value ) ) return;
         
-        if ( is_object( $value ) ) $value = (array)$value;
-        
-        if ( is_string( $value ) )
-        {
-            if ( self::TYPECASTER===$type && is_callable(array(__CLASS__, "TYPE_$value")) )
-            {
-                $value = array(__CLASS__, "TYPE_$value");
-                self::walk_and_add( $model->Types, explode('.', $dottedKey), call_user_func( $value ) );
-            }
-            elseif ( self::VALIDATOR===$type && is_callable(array(__CLASS__, "VALIDATE_$value")) )
-            {
-                $value = array(__CLASS__, "VALIDATE_$value");
-                self::walk_and_add( $model->Validators, explode('.', $dottedKey), call_user_func( $value ) );
-            }
-        }
-        
-        elseif ( is_array( $value ) && 2 === count($value) && is_callable( $value ) )
-        {
-            if ( self::TYPECASTER===$type )
-                self::walk_and_add( $model->Types, explode('.', $dottedKey), $value );
-            elseif ( self::VALIDATOR===$type )
-                self::walk_and_add( $model->Validators, explode('.', $dottedKey), $value );
-        }
-        
-        else if ( is_array( $value ) )
+        if ( (is_array( $value ) || is_object( $value )) && 
+            !($value instanceof ModelTypeCaster) && !($value instanceof ModelValidator)
+        )
         {
             // nested keys given, recurse
-            foreach ( $value as $k=>$v ) 
+            foreach ( (array)$value as $k=>$v ) 
                 self::add_type_validator( $model, $type, "{$dottedKey}.{$k}", $v );
+        }
+        
+        else
+        {
+            if ( self::TYPECASTER===$type && ($value instanceof ModelTypeCaster) )
+                self::walk_and_add( $model->Types, explode('.', $dottedKey), $value );
+            elseif ( self::VALIDATOR===$type && ($value instanceof ModelValidator) )
+                self::walk_and_add( $model->Validators, explode('.', $dottedKey), $value );
         }
     }
     
-    //
-    // TypeCasters
-    
-    public static function TYPE_COMPOSITE( $typecaster ) 
-    {
-        $args = func_get_args( );
-        if ( is_array($args[0]) && !is_callable($args[0]) ) $args = $args[ 0 ];
-        $t = new ModelTypeCaster( (array)$args );
-        return array($t, 'typecast_composite');
-    }
-    
-    public static function TYPE_FIELDS( $typesPerField ) 
-    {
-        $t = new ModelTypeCaster( (array)$typesPerField );
-        return array($t, 'typecast_fields');
-    }
-    
-    public static function TYPE_DEFAULT( $defaultValue ) 
-    {
-        $t = new ModelTypeCaster( $defaultValue );
-        return array($t, 'typecast_default');
-    }
-    
-    public static function TYPE_BOOL( )
-    {
-        $t = new ModelTypeCaster( );
-        return array($t, 'typecast_bool');
-    }
-    
-    public static function TYPE_INT( ) 
-    { 
-        $t = new ModelTypeCaster( );
-        return array($t, 'typecast_int');
-    }
-    
-    public static function TYPE_FLOAT( ) 
-    { 
-        $t = new ModelTypeCaster( );
-        return array($t, 'typecast_float');
-    }
-    
-    public static function TYPE_TRIM( ) 
-    { 
-        $t = new ModelTypeCaster( );
-        return array($t, 'typecast_trim');
-    }
-    
-    public static function TYPE_LCASE( ) 
-    { 
-        $t = new ModelTypeCaster( );
-        return array($t, 'typecast_lcase');
-    }
-    
-    public static function TYPE_UCASE( ) 
-    { 
-        $t = new ModelTypeCaster( );
-        return array($t, 'typecast_ucase');
-    }
-            
-    public static function TYPE_STR( ) 
-    { 
-        $t = new ModelTypeCaster( );
-        return array($t, 'typecast_str');
-    }
-    
-    public static function TYPE_MIN( $m ) 
-    {  
-        $t = new ModelTypeCaster( $m );
-        return array($t, 'typecast_min');
-    }
-    
-    public static function TYPE_MAX( $M ) 
-    {  
-        $t = new ModelTypeCaster( $M );
-        return array($t, 'typecast_max');
-    }
-    
-    public static function TYPE_CLAMP( $m, $M ) 
-    {  
-        // swap
-        if ( $m > $M ) { $tmp = $M; $M = $m; $m = $tmp; }
-        $t = new ModelTypeCaster( array($m, $M) );
-        return array($t, 'typecast_clamp');
-    }
-    
-    public static function TYPE_PAD( $pad_char, $pad_size, $pad_type="L" ) 
-    { 
-        $t = new ModelTypeCaster( array($pad_char, $pad_size, $pad_type) );
-        return array($t, 'typecast_pad');
-    }
-    
-    public static function TYPE_DATETIME( $format="Y-m-d", $locale=null ) {
-        if ( !$locale ) $locale = self::$default_date_locale;
-        $t = new ModelTypeCaster( array($format, $locale) );
-        return array($t, 'typecast_datetime');
-    }
-    
-    //
-    // Validators
-    
-    public static function VALIDATE_FIELDS( $validatorsPerField )
-    {
-        $v = new ModelValidator( (array)$validatorsPerField );
-        return array($v, 'validate_fields');
-    }
-    
-    public static function VALIDATE_NUMERIC( )
-    {
-        $v = new ModelValidator( );
-        return array($v, 'validate_numeric');
-    }
-    
-    public static function VALIDATE_EMPTY( )
-    {
-        $v = new ModelValidator( );
-        return array($v, 'validate_empty');
-    }
-    
-    public static function VALIDATE_NOT_EMPTY( )
-    {
-        $v = new ModelValidator( );
-        return array($v, 'validate_not_empty');
-    }
-    
-    public static function VALIDATE_MAXLEN( $len=0 )
-    {
-        $v = new ModelValidator( $len );
-        return array($v, 'validate_maxlen');
-    }
-    
-    public static function VALIDATE_MINLEN( $len=0 )
-    {
-        $v = new ModelValidator( $len );
-        return array($v, 'validate_minlen');
-    }
-    
-    public static function VALIDATE_MATCH( $regex_pattern )
-    {
-        $v = new ModelValidator( $regex_pattern );
-        return array($v, 'validate_match');
-    }
-    
-    public static function VALIDATE_NOT_MATCH( $regex_pattern )
-    {
-        $v = new ModelValidator( $regex_pattern );
-        return array($v, 'validate_not_match');
-    }
-    
-    public static function VALIDATE_EQUAL( $val, $strict=true )
-    {
-        $v = new ModelValidator( array($val, $strict) );
-        return array($v, 'validate_equal');
-    }
-    
-    public static function VALIDATE_NOT_EQUAL( $val, $strict=true )
-    {
-        $v = new ModelValidator( array($val, $strict) );
-        return array($v, 'validate_not_equal');
-    }
-    
-    public static function VALIDATE_GREATER_THAN( $m, $strict=true )
-    {
-        $v = new ModelValidator( array($m, $strict) );
-        return array($v, 'validate_greater_than');
-    }
-    
-    public static function VALIDATE_LESS_THAN( $M, $strict=true )
-    {
-        $v = new ModelValidator( array($M, $strict) );
-        return array($v, 'validate_less_than');
-    }
-    
-    public static function VALIDATE_BETWEEN( $m, $M, $strict=true )
-    {
-        if ( is_array($m) ) { $strict = $M; $M = $m[1]; $m = $m[0]; }
-        // swap
-        if ( $m > $M ) { $tmp = $M; $M = $m; $m = $tmp; }
-        $v = new ModelValidator( array($m, $M, $strict) );
-        return array($v, 'validate_between');
-    }
-    
-    public static function VALIDATE_NOT_BETWEEN( $m, $M, $strict=true )
-    {
-        if ( is_array($m) ) { $strict = $M; $M = $m[1]; $m = $m[0]; }
-        // swap
-        if ( $m > $M ) { $tmp = $M; $M = $m; $m = $tmp; }
-        $v = new ModelValidator( array($m, $M, $strict) );
-        return array($v, 'validate_not_between');
-    }
-    
-    public static function VALIDATE_IN( /* var args here */ )
-    {
-        $args = func_get_args( );
-        if ( isset($args[0]) && is_array($args[0]) ) $args = $args[0];
-        $v = new ModelValidator( $args );
-        return array($v, 'validate_in');
-    }
-    
-    public static function VALIDATE_NOT_IN( /* var args here */ )
-    {
-        $args = func_get_args( );
-        if ( isset($args[0]) && is_array($args[0]) ) $args = $args[0];
-        $v = new ModelValidator( $args );
-        return array($v, 'validate_not_in');
-    }
-    
-    public static function VALIDATE_MIN_ITEMS( $limit, $item_filter=null )
-    {
-        $v = new ModelValidator( array(intval($limit,10), $item_filter&&is_callable($item_filter)?$item_filter:null) );
-        return array($v, 'validate_min_items');
-    }
-    
-    public static function VALIDATE_MAX_ITEMS( $limit, $item_filter=null )
-    {
-        $v = new ModelValidator( array(intval($limit,10), $item_filter&&is_callable($item_filter)?$item_filter:null) );
-        return array($v, 'validate_max_items');
-    }
-    
-    public static function VALIDATE_EMAIL( )
-    {
-        $v = new ModelValidator( );
-        return array($v, 'validate_email');
-    }
-    
-    public static function VALIDATE_URL( )
-    {
-        $v = new ModelValidator( );
-        return array($v, 'validate_url');
-    }
-    
-    public static function VALIDATE_DATETIME( $format="Y-m-d", $locale=null)
-    {
-        if ( !$locale ) $locale = self::$default_date_locale;
-        $v = new ModelValidator( self::get_date_pattern( $format, $locale ) );
-        return array($v, 'validate_datetime');
-    }
-    
-    public static function Node( $val=null, $next=array() ) 
+    public static function node( $val=null, $next=array() ) 
     {
         return (object)array( 
             'v' => $val ? $val : null,
@@ -1140,11 +1255,11 @@ class ModelData
             // Day of week; 0[Sun]..6[Sat]
             ,'w'=> '([0-6])'
             // Day of year; 0..365
-            ,'z'=> '([0-3]?[0-9]{1,2})'
+            ,'z'=> '([1-3]?[0-9]{1,2})'
 
             // Week --
             // ISO-8601 week number
-            ,'W'=> '([0-5][0-9])'
+            ,'W'=> '([0-5]?[0-9])'
 
             // Month --
             // Full month name; January...December
@@ -1164,7 +1279,7 @@ class ModelData
             // ISO-8601 year
             ,'o'=> '(\\d{2,4})'
             // Full year; e.g. 1980...2010
-            ,'Y'=> '([1-9][0-9]{3})'
+            ,'Y'=> '([12][0-9]{3})'
             // Last two digits of year; 00...99
             ,'y'=> '([0-9]{2})'
 

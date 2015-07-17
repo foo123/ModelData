@@ -13,18 +13,15 @@ $model
     'b' => array('2','3','4')
 ))
 ->types(array(
-    'a' => ModelData::TYPE_INT(),
-    'b.*' => ModelData::TYPE_INT()
+    'a' => ModelData::TYPE("INT"),
+    'b.*' => ModelData::TYPE("INT")
 ))
 ->validators(array(
-    'c' => ModelData::VALIDATE_DATETIME('Y-m-d')
+    'b.*' => ModelData::VALIDATOR("NUMERIC")->AND_(ModelData::VALIDATOR("GREATER_THAN", 1)),
+    'c' => ModelData::VALIDATOR("DATETIME", 'Y-m-d')
 ));
 
 $result = $model->typecast( )->validate( );
-
-//print_r( $model->Types );
-
-//print_r( $model->Validators );
 
 print_r( $result );
 

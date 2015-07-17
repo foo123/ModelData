@@ -3,7 +3,8 @@ stdClass Object
     [isValid] => 
     [errors] => Array
         (
-            [0] => c
+            [0] => b.0
+            [1] => c
         )
 
 )
