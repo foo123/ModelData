@@ -705,6 +705,27 @@ class ModelData
         return $this;
     }
     
+    public function map( $data, $map )
+    {
+        if ( empty($data) || empty($map) ) return $data;
+        $mapped = array( );
+        foreach ($data as $k=>$v)
+        {
+            if ( isset($map[$k]) ) 
+            {
+                if ( is_array($map[$k]) )
+                    $mapped[ $k ] = is_array($v) ? $this->map($v, $map[$k]) : $v;
+                else
+                    $mapped[ $map[$k] ] = $v;
+            }
+            else
+            {                
+                $mapped[ $k ] = $v;
+            }
+        }
+        return $mapped;
+    }
+    
     public function data( $data=array( ) )
     {
         if ( 0 < func_num_args( ) )
