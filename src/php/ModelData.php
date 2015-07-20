@@ -705,6 +705,29 @@ class ModelData
         return $this;
     }
     
+    public function filter( $data, $filter, $positive=true )
+    {
+        if ( $positive )
+        {
+            $filtered = array( );
+            foreach((array)$filter as $field)
+            {
+                if ( isset($data[$field]) ) 
+                    $filtered[$field] = $data[$field];
+            }
+            return $filtered;
+        }
+        else
+        {
+            foreach((array)$filter as $field)
+            {
+                if ( isset($data[$field]) ) 
+                    unset($data[$field]);
+            }
+            return $data;
+        }
+    }
+    
     public function map( $data, $map )
     {
         if ( empty($data) || empty($map) ) return $data;
