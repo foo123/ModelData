@@ -46,6 +46,16 @@ class ModelTypeCaster
             unset(self::$custom[ strtolower($type) ]);
     }
     
+    public static function has( $type )
+    {
+        if ( $type )
+        {
+            $type = strtolower($type);
+            return isset(self::$custom[ $type ]) || method_exists('ModelTypeCaster', "t_{$type}");
+        }
+        return false;
+    }
+    
     public function __construct( $typecaster=null, $args=null )
     {
         $this->typecaster = is_string($typecaster) ? strtolower($typecaster) : null;
@@ -245,6 +255,16 @@ class ModelValidator
     {
         if ( $type && isset(self::$custom[ strtolower($type) ]) )
             unset(self::$custom[ strtolower($type) ]);
+    }
+    
+    public static function has( $type )
+    {
+        if ( $type )
+        {
+            $type = strtolower($type);
+            return isset(self::$custom[ $type ]) || method_exists('ModelValidator', "v_{$type}");
+        }
+        return false;
     }
     
     public function __construct( $validator=null, $args=null )
@@ -702,6 +722,14 @@ class ModelData
         $this->Data = null;
         $this->Types = null;
         $this->Validators = null;
+        return $this;
+    }
+    
+    public function reset( )
+    {
+        $this->Types = array( );
+        $this->Validators = array( );
+        $this->Data = array( );
         return $this;
     }
     
