@@ -915,7 +915,7 @@ class ModelData
         return $results;
     }
     
-    public function del( $fields )
+    public function rem( $fields )
     {
         if ( !$fields || empty( $fields ) ) return $this;
         $data =& $this->model_data;
