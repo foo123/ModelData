@@ -573,9 +573,9 @@ class ModelData
     
     public static $default_date_locale = null;
     
-    public $Data = null;
-    public $Types = null;
-    public $Validators = null;
+    public $model_data = null;
+    public $model_types = null;
+    public $model_validators = null;
     
     // Array multi - sorter utility
     // returns a sorter that can (sub-)sort by multiple (nested) fields 
@@ -707,8 +707,8 @@ class ModelData
     
     public function __construct( $data=array( ) )
     {
-        $this->Types = array( );
-        $this->Validators = array( );
+        $this->model_types = array( );
+        $this->model_validators = array( );
         $this->data( $data );
     }
     
@@ -719,17 +719,17 @@ class ModelData
     
     public function dispose( )
     {
-        $this->Data = null;
-        $this->Types = null;
-        $this->Validators = null;
+        $this->model_data = null;
+        $this->model_types = null;
+        $this->model_validators = null;
         return $this;
     }
     
     public function reset( )
     {
-        $this->Types = array( );
-        $this->Validators = array( );
-        $this->Data = array( );
+        $this->model_types = array( );
+        $this->model_validators = array( );
+        $this->model_data = array( );
         return $this;
     }
     
@@ -747,12 +747,13 @@ class ModelData
         }
         else
         {
-            foreach((array)$filter as $field)
+            $filtered = array( );
+            foreach($data as $field=>$v)
             {
-                if ( isset($data[$field]) ) 
-                    unset($data[$field]);
+                if ( !in_array($field, $filter) ) 
+                    $filtered[$field] = $v;
             }
-            return $data;
+            return $filtered;
         }
     }
     
@@ -781,17 +782,18 @@ class ModelData
     {
         if ( 0 < func_num_args( ) )
         {
-            $this->Data = $data;
+            $this->model_data = $data;
             return $this;
         }
-        return $this->Data;
+        return $this->model_data;
     }
     
-    public function defaults( $defaults )
+    public function defaults( $defaults, $overwrite=false )
     {
         if ( !empty( $defaults) )
         {
-            $data =& $this->Data;
+            $overwrite = false !== $overwrite;
+            $data =& $this->model_data;
             $is_object = is_object( $data ); $is_array = is_array( $data );
             if ( $is_object || $is_array )
             {
@@ -799,26 +801,26 @@ class ModelData
                 {
                     if ( $is_object ) 
                     {
-                        if ( !isset( $data->{$k} ) )
+                        if ( $overwrite || !isset( $data->{$k} ) )
                         {
                             $data->{$k} = $v;
                         }
                         elseif ( (is_array( $data->{$k} ) || is_object( $data->{$k} )) && 
                         (is_array( $v ) || is_object( $v )) )
                         {
-                            $data->{$k} = self::do_defaults( $this, $data->{$k}, $v );
+                            $data->{$k} = self::do_defaults( $this, $data->{$k}, $v, $overwrite );
                         }
                     }
                     else/*if ( $is_array )*/
                     {
-                        if ( !isset($data[$k]) )
+                        if ( $overwrite || !isset($data[$k]) )
                         {
                             $data[$k] = $v;
                         }
                         elseif ( (is_array( $data[$k] ) || is_object( $data[$k] )) && 
                         (is_array( $v ) || is_object( $v )) )
                         {
-                            $data[$k] = self::do_defaults( $this, $data[$k], $v );
+                            $data[$k] = self::do_defaults( $this, $data[$k], $v, $overwrite );
                         }
                     }
                 }
@@ -831,7 +833,7 @@ class ModelData
     {
         $results = array( );
         if ( !$fields || empty( $fields ) ) return $results;
-        $data =& $this->Data;
+        $data =& $this->model_data;
         $is_object = is_object( $data ); $is_array = is_array( $data );
         if ( $is_object || $is_array )
         {
@@ -916,7 +918,7 @@ class ModelData
     public function del( $fields )
     {
         if ( !$fields || empty( $fields ) ) return $this;
-        $data =& $this->Data;
+        $data =& $this->model_data;
         $is_object = is_object( $data ); $is_array = is_array( $data );
         if ( $is_object || $is_array )
         {
@@ -1028,7 +1030,7 @@ class ModelData
     
     public function typecast( )
     {
-        $data =& $this->Data;
+        $data =& $this->model_data;
         if ( !empty($data) )
         {
             $is_object = is_object( $data ); $is_array = is_array( $data );
@@ -1044,7 +1046,7 @@ class ModelData
     
     public function validate( $breakOnFirstError=false )
     {
-        $data =& $this->Data;
+        $data =& $this->model_data;
         $result = (object)array(
             'isValid' => true,
             'errors' => array()
@@ -1094,7 +1096,7 @@ class ModelData
         return null;
     }
     
-    public static function do_defaults( $model, $data, $defaults )
+    public static function do_defaults( $model, $data, $defaults, $overwrite )
     {
         $is_object = is_object( $data ); $is_array = is_array( $data );
         if ( $is_object || $is_array )
@@ -1103,26 +1105,26 @@ class ModelData
             {
                 if ( $is_object ) 
                 {
-                    if ( !isset($data->{$k}) )
+                    if ( $overwrite || !isset($data->{$k}) )
                     {
                         $data->{$k} = $v;
                     }
                     elseif ( (is_array( $data->{$k} ) || is_object( $data->{$k} )) && 
                     (is_array( $v ) || is_object( $v )) )
                     {
-                        $data->{$k} = self::do_defaults( $this, $data->{$k}, $v );
+                        $data->{$k} = self::do_defaults( $this, $data->{$k}, $v, $overwrite );
                     }
                 }
                 else/*if ( $is_array )*/
                 {
-                    if ( !isset($data[$k]) )
+                    if ( $overwrite || !isset($data[$k]) )
                     {
                         $data[$k] = $v;
                     }
                     elseif ( (is_array( $data[$k] ) || is_object( $data[$k] )) && 
                     (is_array( $v ) || is_object( $v )) )
                     {
-                        $data[$k] = self::do_defaults( $this, $data[$k], $v );
+                        $data[$k] = self::do_defaults( $this, $data[$k], $v, $overwrite );
                     }
                 }
             }
@@ -1132,7 +1134,7 @@ class ModelData
     
     public static function do_typecast( $model, $dottedKey, $data )
     {
-        $typecaster = self::walk_and_get( $model->Types, $dottedKey );
+        $typecaster = self::walk_and_get( $model->model_types, $dottedKey );
         if ( $typecaster /*&& ($typecaster instanceof ModelTypeCaster)*//*is_callable( $typecaster )*/ )
         {
             //return call_user_func( $typecaster, $data, $dottedKey, $model );
@@ -1161,7 +1163,7 @@ class ModelData
             'errors' => array()
         );
         
-        $validator = self::walk_and_get( $model->Validators, $dottedKey );
+        $validator = self::walk_and_get( $model->model_validators, $dottedKey );
         if ( $validator /*&& ($validator instanceof ModelValidator)*//*is_callable( $validator )*/ )
         {
             //$res = call_user_func( $validator, $data, $dottedKey, $model );
@@ -1228,9 +1230,9 @@ class ModelData
         else
         {
             if ( self::TYPECASTER===$type && ($value instanceof ModelTypeCaster) )
-                self::walk_and_add( $model->Types, explode('.', $dottedKey), $value );
+                self::walk_and_add( $model->model_types, explode('.', $dottedKey), $value );
             elseif ( self::VALIDATOR===$type && ($value instanceof ModelValidator) )
-                self::walk_and_add( $model->Validators, explode('.', $dottedKey), $value );
+                self::walk_and_add( $model->model_validators, explode('.', $dottedKey), $value );
         }
     }
     
