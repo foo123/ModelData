@@ -686,7 +686,7 @@ class ModelData
         return null;
     }
     
-    public static function init( )
+    public static function _init_( )
     {
         static $inited = false;
         if ( !$inited )
@@ -1427,5 +1427,5 @@ class ModelData
     }
     
 }
-ModelData::init( );
+ModelData::_init_( );
 }
