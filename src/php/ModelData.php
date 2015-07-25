@@ -571,6 +571,17 @@ class ModelData
     const VALIDATOR = 2;
     const WILDCARD = "*";
     
+    const T_BOOL = 4;
+    const T_NUM = 8;
+    const T_STR = 16;
+    const T_CHAR = 17;
+    const T_ARRAY = 32;
+    const T_OBJ = 64;
+    const T_ASSOC = 65;
+    const T_FUNC = 128;
+    const T_NULL = 256;
+    const T_UNKNOWN = 512;
+    
     public static $default_date_locale = array(
     'meridian'=> array( 'am'=>'am', 'pm'=>'pm', 'AM'=>'AM', 'PM'=>'PM' ),
     'ordinal'=> array( 'ord'=>array(1=>'st',2=>'nd',3=>'rd'), 'nth'=>'th' ),
@@ -662,6 +673,28 @@ class ModelData
         }
     }
 
+    public static function get_type( $o )
+    {
+        if ( null === $o || !isset($o) ) return self::T_NULL:
+        if ( true === $o || false === $o ) return self::T_BOOL:
+        if ( is_string( $o ) ) return 1===strlen($o) ? self::T_CHAR : self::T_STR;
+        if ( is_numeric( $o ) ) return self::T_NUM;
+        if ( is_array( $o ) )
+        {
+            $c = count( $o );
+            if ( ($c <= 0) || (array_keys( $o ) === range(0, $c - 1)) )  return self::T_ARRAY;
+            return self::T_ASSOC;
+        }
+        if ( is_callable( $o ) ) return self::T_FUNC;
+        if ( $o instanceof \stdClass ) return self::T_OBJ;
+        return self::T_UNKNOWN;
+    }
+    
+    public static function is_type( $o, $type )
+    {
+        return (bool)(self::get_type( $o ) & $type );
+    }
+    
     public static function Field( $f )
     {
         return new ModelField( $f );
