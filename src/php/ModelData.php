@@ -730,8 +730,8 @@ class ModelData
             $filtered = array( );
             foreach((array)$filter as $field)
             {
-                if ( isset($data[$field]) ) 
-                    $filtered[$field] = $data[$field];
+                if ( isset( $data[$field] ) ) 
+                    $filtered[ $field ] = $data[ $field ];
             }
             return $filtered;
         }
@@ -740,19 +740,18 @@ class ModelData
             $filtered = array( );
             foreach($data as $field=>$v)
             {
-                if ( !in_array($field, $filter) ) 
-                    $filtered[$field] = $v;
+                if ( !in_array( $field, $filter ) ) 
+                    $filtered[ $field ] = $v;
             }
             return $filtered;
         }
     }
     
-    public function pluck( $data, $fields=array() )
+    public function pluck( $data, $fields )
     {
-        if ( empty($fields) ) return $data;
-        
-        $plucked = array();
-        $fields = is_string($fields) ? explode(',', $fields) : (array)$fields;
+        $plucked = array( );
+        $fields = is_string($fields) ? explode( ',', $fields ) : (array)$fields;
+        $fields = array_filter( array_map( 'trim', $fields ), 'strlen' );
         
         if ( count($fields) > 1 )
         {
@@ -761,10 +760,11 @@ class ModelData
                 $selected = array( );
                 foreach($fields as $field)
                 {
-                    if ( isset($entry[$field]) ) 
-                        $selected[$field] = $entry[$field];
+                    if ( isset( $entry[$field] ) ) 
+                        $selected[ $field ] = $entry[ $field ];
                 }
-                $plucked[$index] = $selected;
+                if ( $entry instanceof \stdClass ) $selected = (object)$selected;
+                $plucked[ $index ] = $selected;
             }
         }
         else
@@ -772,13 +772,39 @@ class ModelData
             $field = $fields[ 0 ];
             foreach((array)$data as $index=>$entry)
             {
-                $plucked[$index] = isset($entry[$field]) ? $entry[$field] : null;
+                $plucked[ $index ] = isset( $entry[$field] ) ? $entry[ $field ] : null;
             }
         }
         return $plucked;
     }
     
-    public function map( $data, $map )
+    public function group( $data, $field )
+    {
+        $grouped = array( );
+        foreach((array)$data as $index=>$entry)
+        {
+            if ( isset( $entry[$field] ) )
+            {
+                $id = $entry[ $field ];
+                if ( !isset($grouped[ $id ]) ) $grouped[ $id ] = array( $entry );
+                else $grouped[ $id ][ ] = $entry;
+            }
+        }
+        return $grouped;
+    }
+    
+    public function flatten( $data )
+    {
+        $flattened = array( );
+        foreach((array)$data as $entry)
+        {
+            if ( is_array($entry) ) $flattened = array_merge( $flattened, $this->flatten( $entry ) );
+            else $flattened[] = $entry;
+        }
+        return $flattened;
+    }
+    
+    public function remap( $data, $map )
     {
         if ( empty($data) || empty($map) ) return $data;
         $mapped = array( );
@@ -786,8 +812,8 @@ class ModelData
         {
             if ( isset($map[$k]) ) 
             {
-                if ( is_array($map[$k]) )
-                    $mapped[ $k ] = is_array($v) ? $this->map($v, $map[$k]) : $v;
+                if ( is_array( $map[$k] ) )
+                    $mapped[ $k ] = is_array( $v ) ? $this->remap( $v, $map[$k] ) : $v;
                 else
                     $mapped[ $map[$k] ] = $v;
             }
