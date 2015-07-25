@@ -571,7 +571,16 @@ class ModelData
     const VALIDATOR = 2;
     const WILDCARD = "*";
     
-    public static $default_date_locale = null;
+    public static $default_date_locale = array(
+    'meridian'=> array( 'am'=>'am', 'pm'=>'pm', 'AM'=>'AM', 'PM'=>'PM' ),
+    'ordinal'=> array( 'ord'=>array(1=>'st',2=>'nd',3=>'rd'), 'nth'=>'th' ),
+    'timezone'=> array( 'UTC','EST','MDT' ),
+    'timezone_short'=> array( 'UTC','EST','MDT' ),
+    'day'=> array( 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday' ),
+    'day_short'=> array( 'Sun','Mon','Tue','Wed','Thu','Fri','Sat' ),
+    'month'=> array( 'January','February','March','April','May','June','July','August','September','October','November','December' ),
+    'month_short'=> array( 'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec' )
+    );
     
     public $model_data = null;
     public $model_types = null;
@@ -684,25 +693,6 @@ class ModelData
             return new ModelValidator( $validator, $args );
         }
         return null;
-    }
-    
-    public static function _init_( )
-    {
-        static $inited = false;
-        if ( !$inited )
-        {
-            self::$default_date_locale = array(
-                'meridian'=> array( 'am'=>'am', 'pm'=>'pm', 'AM'=>'AM', 'PM'=>'PM' ),
-                'ordinal'=> array( 'ord'=>array(1=>'st',2=>'nd',3=>'rd'), 'nth'=>'th' ),
-                'timezone'=> array( 'UTC','EST','MDT' ),
-                'timezone_short'=> array( 'UTC','EST','MDT' ),
-                'day'=> array( 'Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday' ),
-                'day_short'=> array( 'Sun','Mon','Tue','Wed','Thu','Fri','Sat' ),
-                'month'=> array( 'January','February','March','April','May','June','July','August','September','October','November','December' ),
-                'month_short'=> array( 'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec' )
-            );
-            $inited = true;
-        }
     }
     
     public function __construct( $data=array( ) )
@@ -1427,5 +1417,4 @@ class ModelData
     }
     
 }
-ModelData::_init_( );
 }
