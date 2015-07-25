@@ -747,6 +747,37 @@ class ModelData
         }
     }
     
+    public function pluck( $data, $fields=array() )
+    {
+        if ( empty($fields) ) return $data;
+        
+        $plucked = array();
+        $fields = is_string($fields) ? explode(',', $fields) : (array)$fields;
+        
+        if ( count($fields) > 1 )
+        {
+            foreach((array)$data as $index=>$entry)
+            {
+                $selected = array( );
+                foreach($fields as $field)
+                {
+                    if ( isset($entry[$field]) ) 
+                        $selected[$field] = $entry[$field];
+                }
+                $plucked[$index] = $selected;
+            }
+        }
+        else
+        {
+            $field = $fields[ 0 ];
+            foreach((array)$data as $index=>$entry)
+            {
+                $plucked[$index] = isset($entry[$field]) ? $entry[$field] : null;
+            }
+        }
+        return $plucked;
+    }
+    
     public function map( $data, $map )
     {
         if ( empty($data) || empty($map) ) return $data;
