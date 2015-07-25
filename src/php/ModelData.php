@@ -675,8 +675,8 @@ class ModelData
 
     public static function get_type( $o )
     {
-        if ( null === $o || !isset($o) ) return self::T_NULL:
-        if ( true === $o || false === $o ) return self::T_BOOL:
+        if ( null === $o || !isset($o) ) return self::T_NULL;
+        if ( true === $o || false === $o ) return self::T_BOOL;
         if ( is_string( $o ) ) return 1===strlen($o) ? self::T_CHAR : self::T_STR;
         if ( is_numeric( $o ) ) return self::T_NUM;
         if ( is_array( $o ) )
