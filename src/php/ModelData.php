@@ -273,6 +273,8 @@ class ModelValidator
         
         switch( $this->validator )
         {
+            case 'min_filesize':
+            case 'max_filesize':
             case 'minlen':
             case 'maxlen':
                 $args = $args ? $args : 0;
@@ -562,6 +564,18 @@ class ModelValidator
         $matches = array( );
         return (bool)preg_match($date_pattern, $v, $matches);
     }
+    
+    public function v_min_filesize( $v, $k, $m )
+    {
+        $size = (int)$this->v;
+        return (bool)((int)$v['size'] >= $size);
+    }
+    
+    public function v_max_filesize( $v, $k, $m )
+    {
+        $size = (int)$this->v;
+        return (bool)((int)$v['size'] <= $size);
+    }
 }
 
 class ModelData
@@ -756,45 +770,59 @@ class ModelData
         return $this;
     }
     
-    public function filter( $data, $filter, $positive=true )
+    public function files( $files )
+    {
+        $o_files = array( );
+        foreach ($files as $k1=>$v1)
+        {
+            foreach ($v1 as $k2=>$v2)
+            {
+                if ( !isset($o_files[$k2]) ) $o_files[$k2] = array( );
+                $o_files[$k2][$k1] = $v2;
+            }
+        }
+        return $o_files;
+    }
+    
+    public function filter( $collection, $filter, $positive=true )
     {
         if ( $positive )
         {
             $filtered = array( );
-            foreach((array)$filter as $field)
+            foreach((array)$filter as $key)
             {
-                if ( isset( $data[$field] ) ) 
-                    $filtered[ $field ] = $data[ $field ];
+                if ( isset( $collection[$key] ) ) 
+                    $filtered[ $key ] = $collection[ $key ];
             }
             return $filtered;
         }
         else
         {
             $filtered = array( );
-            foreach($data as $field=>$v)
+            foreach($collection as $key=>$v)
             {
-                if ( !in_array( $field, $filter ) ) 
-                    $filtered[ $field ] = $v;
+                if ( !in_array( $key, $filter ) ) 
+                    $filtered[ $key ] = $v;
             }
             return $filtered;
         }
     }
     
-    public function pluck( $data, $fields )
+    public function pluck( $collection, $keys )
     {
         $plucked = array( );
-        $fields = is_string($fields) ? explode( ',', $fields ) : (array)$fields;
-        $fields = array_filter( array_map( 'trim', $fields ), 'strlen' );
+        $keys = is_string($keys) ? explode( ',', $keys ) : (array)$keys;
+        $keys = array_filter( array_map( 'trim', $keys ), 'strlen' );
         
-        if ( count($fields) > 1 )
+        if ( count($keys) > 1 )
         {
-            foreach((array)$data as $index=>$entry)
+            foreach((array)$collection as $index=>$entry)
             {
                 $selected = array( );
-                foreach($fields as $field)
+                foreach($keys as $key)
                 {
-                    if ( isset( $entry[$field] ) ) 
-                        $selected[ $field ] = $entry[ $field ];
+                    if ( isset( $entry[$key] ) ) 
+                        $selected[ $key ] = $entry[ $key ];
                 }
                 if ( $entry instanceof \stdClass ) $selected = (object)$selected;
                 $plucked[ $index ] = $selected;
@@ -802,23 +830,23 @@ class ModelData
         }
         else
         {
-            $field = $fields[ 0 ];
-            foreach((array)$data as $index=>$entry)
+            $key = $keys[ 0 ];
+            foreach((array)$collection as $index=>$entry)
             {
-                $plucked[ $index ] = isset( $entry[$field] ) ? $entry[ $field ] : null;
+                $plucked[ $index ] = isset( $entry[$key] ) ? $entry[ $key ] : null;
             }
         }
         return $plucked;
     }
     
-    public function group( $data, $field )
+    public function group( $collection, $key )
     {
         $grouped = array( );
-        foreach((array)$data as $index=>$entry)
+        foreach((array)$collection as $index=>$entry)
         {
-            if ( isset( $entry[$field] ) )
+            if ( isset( $entry[$key] ) )
             {
-                $id = $entry[ $field ];
+                $id = $entry[ $key ];
                 if ( !isset($grouped[ $id ]) ) $grouped[ $id ] = array( $entry );
                 else $grouped[ $id ][ ] = $entry;
             }
@@ -826,10 +854,21 @@ class ModelData
         return $grouped;
     }
     
-    public function flatten( $data )
+    public function join( $collection1, $collection2, $key1, $key2 )
+    {
+        foreach($collection1 as &$item)
+        {
+            $item[ $key1 ] = isset($collection2[ $item[ $key2 ] ]) 
+                            ? (array)$collection2[ $item[ $key2 ] ] 
+                            : array( );
+        }
+        return $collection1;
+    }
+    
+    public function flatten( $collection )
     {
         $flattened = array( );
-        foreach((array)$data as $entry)
+        foreach((array)$collection as $entry)
         {
             if ( is_array($entry) ) $flattened = array_merge( $flattened, $this->flatten( $entry ) );
             else $flattened[] = $entry;
