@@ -784,30 +784,6 @@ class ModelData
         return $o_files;
     }
     
-    public function filter( $collection, $filter, $positive=true )
-    {
-        if ( $positive )
-        {
-            $filtered = array( );
-            foreach((array)$filter as $key)
-            {
-                if ( isset( $collection[$key] ) ) 
-                    $filtered[ $key ] = $collection[ $key ];
-            }
-            return $filtered;
-        }
-        else
-        {
-            $filtered = array( );
-            foreach($collection as $key=>$v)
-            {
-                if ( !in_array( $key, $filter ) ) 
-                    $filtered[ $key ] = $v;
-            }
-            return $filtered;
-        }
-    }
-    
     public function pluck( $collection, $keys )
     {
         $plucked = array( );
@@ -876,25 +852,109 @@ class ModelData
         return $flattened;
     }
     
+    public function filter( $data, $filter, $positive=true )
+    {
+        if ( isset($data[0]) && is_array($data[0]) )
+        {
+            // array of data
+            $collection = array( ); $filter = (array)$filter;
+            if ( $positive )
+            {
+                foreach($data as $datum)
+                {
+                    $filtered = array( );
+                    foreach($filter as $key)
+                    {
+                        if ( isset( $datum[$key] ) ) $filtered[ $key ] = $datum[ $key ];
+                    }
+                    $collection[] = $filtered;
+                }
+            }
+            else
+            {
+                foreach($data as $datum)
+                {
+                    $filtered = array( );
+                    foreach($datum as $key=>$v)
+                    {
+                        if ( !in_array( $key, $filter ) ) $filtered[ $key ] = $v;
+                    }
+                    $collection[] = $filtered;
+                }
+            }
+            return $collection;
+        }
+        else
+        {
+            // single data
+            $filtered = array( ); $filter = (array)$filter;
+            if ( $positive )
+            {
+                foreach($filter as $key)
+                {
+                    if ( isset( $data[$key] ) ) $filtered[ $key ] = $data[ $key ];
+                }
+            }
+            else
+            {
+                foreach($data as $key=>$v)
+                {
+                    if ( !in_array( $key, $filter ) ) $filtered[ $key ] = $v;
+                }
+            }
+            return $filtered;
+        }
+    }
+    
     public function remap( $data, $map )
     {
         if ( empty($data) || empty($map) ) return $data;
-        $mapped = array( );
-        foreach ($data as $k=>$v)
+        
+        if ( isset($data[0]) && is_array($data[0]) )
         {
-            if ( isset($map[$k]) ) 
+            // array of data
+            $collection = array( );
+            foreach($data as $datum)
             {
-                if ( is_array( $map[$k] ) )
-                    $mapped[ $k ] = is_array( $v ) ? $this->remap( $v, $map[$k] ) : $v;
-                else
-                    $mapped[ $map[$k] ] = $v;
+                $mapped = array( );
+                foreach ($datum as $k=>$v)
+                {
+                    if ( isset($map[$k]) ) 
+                    {
+                        if ( is_array( $map[$k] ) )
+                            $mapped[ $k ] = is_array( $v ) ? $this->remap( $v, $map[$k] ) : $v;
+                        else
+                            $mapped[ $map[$k] ] = $v;
+                    }
+                    else
+                    {                
+                        $mapped[ $k ] = $v;
+                    }
+                }
+                $collection[] = $mapped;
             }
-            else
-            {                
-                $mapped[ $k ] = $v;
-            }
+            return $collection;
         }
-        return $mapped;
+        else
+        {
+            // single data
+            $mapped = array( );
+            foreach ($data as $k=>$v)
+            {
+                if ( isset($map[$k]) ) 
+                {
+                    if ( is_array( $map[$k] ) )
+                        $mapped[ $k ] = is_array( $v ) ? $this->remap( $v, $map[$k] ) : $v;
+                    else
+                        $mapped[ $map[$k] ] = $v;
+                }
+                else
+                {                
+                    $mapped[ $k ] = $v;
+                }
+            }
+            return $mapped;
+        }
     }
     
     public function data( $data=array( ) )
