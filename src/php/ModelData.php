@@ -626,6 +626,7 @@ class ModelData
         {
             $step = 1;
             $sorter = array();
+            $variables = array();
             $sorter_args = array();
             $filter_args = array(); 
             for ($i=$l-1; $i>=0; $i--)
@@ -665,15 +666,18 @@ class ModelData
                     $a = 'call_user_func(' . $filter_args[0] . ',' . $a . ')';
                     $b = 'call_user_func(' . $filter_args[0] . ',' . $b . ')';
                 }
+                $avar = '$a_'.$i; $bvar = '$b_'.$i;
+                array_unshift($variables, ''.$avar.'='.$a.';'.$bvar.'='.$b.';');
                 $lt = $desc ?(''.$step):('-'.$step); $gt = $desc ?('-'.$step):(''.$step);
-                array_unshift($sorter, "(".$a." < ".$b." ? ".$lt." : (".$a." > ".$b." ? ".$gt." : 0))");
+                array_unshift($sorter, "(".$avar." < ".$bvar." ? ".$lt." : (".$avar." > ".$bvar." ? ".$gt." : 0))");
                 $step <<= 1;
             }
             // use actual php anonynous function/closure
             // needs PHP 5.3+
             $sorter_factory = create_function(implode(',',$filter_args), implode("\n", array(
                 '$sorter = function($a,$b) use('.implode(',',$filter_args).') {',
-                '    return ('.implode(' + ', $sorter).');',
+                '    '.implode("\n", $variables).'',
+                '    return '.implode('+', $sorter).';',
                 '};',
                 'return $sorter;'
             )));
@@ -683,7 +687,7 @@ class ModelData
         {
             $a = '$a'; $b = '$b'; $lt = '-1'; $gt = '1';
             $sorter = "".$a." < ".$b." ? ".$lt." : (".$a." > ".$b." ? ".$gt." : 0)";
-            return create_function('$a,$b', 'return ('.$sorter.');');
+            return create_function('$a,$b', 'return '.$sorter.';');
         }
     }
 
