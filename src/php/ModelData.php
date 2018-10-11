@@ -3,7 +3,7 @@
 *   ModelData
 *   uses similar API to ModelView.js to typecast and validate model data
 *
-*   @version 0.1
+*   @version 0.1.1
 *   https://github.com/foo123/ModelData
 *
 **/
@@ -580,7 +580,7 @@ class ModelValidator
 
 class ModelData
 {
-    const VERSION = "0.1";
+    const VERSION = "0.1.1";
     const TYPECASTER = 1;
     const VALIDATOR = 2;
     const WILDCARD = "*";
@@ -674,7 +674,8 @@ class ModelData
             }
             // use actual php anonynous function/closure
             // needs PHP 5.3+
-            $sorter_factory = create_function(implode(',',$filter_args), implode("\n", array(
+            // create_function is deprecated as of PHP 7.2+
+            $sorter_factory = @create_function(implode(',',$filter_args), implode("\n", array(
                 '$sorter = function($a,$b) use('.implode(',',$filter_args).') {',
                 '    '.implode("\n", $variables).'',
                 '    return '.implode('+', $sorter).';',
@@ -687,7 +688,8 @@ class ModelData
         {
             $a = '$a'; $b = '$b'; $lt = '-1'; $gt = '1';
             $sorter = "".$a." < ".$b." ? ".$lt." : (".$a." > ".$b." ? ".$gt." : 0)";
-            return create_function('$a,$b', 'return '.$sorter.';');
+            // create_function is deprecated as of PHP 7.2+
+            return @create_function('$a,$b', 'return '.$sorter.';');
         }
     }
 
