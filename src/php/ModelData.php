@@ -3,11 +3,11 @@
 *   ModelData
 *   uses similar API to ModelView.js to typecast and validate model data
 *
-*   @version 0.1.1
+*   @version 0.2.0
 *   https://github.com/foo123/ModelData
 *
 **/
-if ( !class_exists("ModelData") )
+if ( !class_exists("ModelData", false) )
 {
 class ModelField
 {
@@ -403,6 +403,11 @@ class ModelValidator
         return true;
     }
     
+    /*public function v_optional( $v, $k, $m )
+    {
+        return $v;
+    }*/
+    
     public function v_numeric( $v, $k, $m )
     {
         return is_numeric( $v );
@@ -580,7 +585,7 @@ class ModelValidator
 
 class ModelData
 {
-    const VERSION = "0.1.1";
+    const VERSION = "0.2.0";
     const TYPECASTER = 1;
     const VALIDATOR = 2;
     const WILDCARD = "*";
@@ -1236,19 +1241,18 @@ class ModelData
             'isValid' => true,
             'errors' => array()
         );
-        if ( !empty($data) )
+        if ( empty($data) ) return $result;
+        
+        foreach((array)$data as $k=>$v)
         {
-            foreach((array)$data as $k=>$v)
+            $res = self::do_validate( $this, $k, $v, $breakOnFirstError );
+            if ( !$res->isValid )
             {
-                $res = self::do_validate( $this, $k, $v, $breakOnFirstError );
-                if ( !$res->isValid )
+                $result->isValid = false;
+                $result->errors = array_merge($result->errors, $res->errors);
+                if ( $breakOnFirstError )
                 {
-                    $result->isValid = false;
-                    $result->errors = array_merge($result->errors, $res->errors);
-                    if ( $breakOnFirstError )
-                    {
-                        return $result;
-                    }
+                    return $result;
                 }
             }
         }
@@ -1366,7 +1370,7 @@ class ModelData
             {
                 foreach((array)$data as $k=>$v)
                 {
-                    $res = self::do_validate( $model, "{$dottedKey}.{$k}", $v );
+                    $res = self::do_validate( $model, "{$dottedKey}.{$k}", $v, $breakOnFirstError );
                     if ( !$res->isValid )
                     {
                         $result->isValid = false;
